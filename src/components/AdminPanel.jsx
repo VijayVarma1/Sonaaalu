@@ -1,27 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import html2pdf from 'html2pdf.js';
 
 const AdminPanel = () => {
-    const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('config')) || {
+    const [config, setConfig] = useState({
         fillBlanks: { marks: '', count: '' },
         objective: { marks: '', count: '' },
         trueFalse: { marks: '', count: '' },
         descriptive: { marks: '', count: '' },
     });
-    const [numPapers, setNumPapers] = useState(() => parseInt(localStorage.getItem('numPapers')) || 1);
+    const [numPapers, setNumPapers] = useState(1);
     const [excelData, setExcelData] = useState({});
     const [generatedPapers, setGeneratedPapers] = useState([]);
     const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        localStorage.setItem('config', JSON.stringify(config));
-        localStorage.setItem('numPapers', numPapers);
-    }, [config, numPapers]);
 
     const handleConfigChange = (e, section, field) => {
         const value = parseInt(e.target.value) || '';
@@ -41,43 +35,25 @@ const AdminPanel = () => {
                 acc[name] = XLSX.utils.sheet_to_json(workbook.Sheets[name]);
                 return acc;
             }, {});
-            const expectedSheets = ['Sheet1', 'Sheet2', 'Sheet3', 'Sheet4'];
-            const missing = expectedSheets.filter(sheet => !sheets[sheet]);
-            if (missing.length) {
-                alert(`Missing sheets in Excel file: ${missing.join(', ')}`);
-                return;
-            }
             setExcelData(sheets);
         };
         reader.readAsBinaryString(file);
     };
 
-    const getRandomItems = (arr, count, sectionName) => {
-        if (!Array.isArray(arr)) {
-            alert(`❌ ${sectionName} data not loaded properly. Please check the uploaded Excel file.`);
-            return [];
-        }
-        if (arr.length < count) {
-            alert(`⚠️ Not enough questions in ${sectionName}. Needed: ${count}, Available: ${arr.length}`);
-            return [];
-        }
+    const getRandomItems = (arr, count) => {
+        if (!Array.isArray(arr) || arr.length < count) return [];
         const shuffled = [...arr].sort(() => 0.5 - Math.random());
         return shuffled.slice(0, count);
     };
 
     const handleGeneratePaper = () => {
-        if (!excelData['Sheet1'] || !excelData['Sheet2'] || !excelData['Sheet3'] || !excelData['Sheet4']) {
-            alert('🚫 Please upload a valid Excel file with 4 sheets named Sheet1 to Sheet4 before generating papers.');
-            return;
-        }
-
         const papers = [];
         for (let i = 0; i < numPapers; i++) {
-            const code = `RIL-${uuidv4().slice(0, 6).toUpperCase()}-${i + 1}`;
-            const fillBlanks = getRandomItems(excelData['Sheet1'], config.fillBlanks.count, 'Fill in the Blanks');
-            const objective = getRandomItems(excelData['Sheet2'], config.objective.count, 'Objective');
-            const trueFalse = getRandomItems(excelData['Sheet3'], config.trueFalse.count, 'True/False');
-            const descriptive = getRandomItems(excelData['Sheet4'], config.descriptive.count, 'Descriptive');
+            const code = `RIL-${uuidv4().slice(0, 6).toUpperCase()}`;
+            const fillBlanks = getRandomItems(excelData['Sheet1'] || [], config.fillBlanks.count);
+            const objective = getRandomItems(excelData['Sheet2'] || [], config.objective.count);
+            const trueFalse = getRandomItems(excelData['Sheet3'] || [], config.trueFalse.count);
+            const descriptive = getRandomItems(excelData['Sheet4'] || [], config.descriptive.count);
             papers.push({ code, fillBlanks, objective, trueFalse, descriptive });
         }
         setGeneratedPapers(papers);
@@ -90,23 +66,32 @@ const AdminPanel = () => {
         );
 
     const generatePDFBlob = async (element) => {
-        const canvas = await html2canvas(element, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        return pdf.output('blob');
+        const opt = {
+            margin: 10,
+            filename: 'temp.pdf',
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        };
+        return html2pdf().from(element).set(opt).outputPdf('blob');
     };
 
     const downloadAllAsZip = async () => {
         setLoading(true);
         const zip = new JSZip();
+
         for (let i = 0; i < generatedPapers.length; i++) {
-            const el = document.getElementById(`paper-${i}`);
-            const blob = await generatePDFBlob(el);
-            zip.file(`${generatedPapers[i].code}.pdf`, blob);
+            const code = generatedPapers[i].code;
+            const questionEl = document.getElementById(`question-${code}`);
+            const answerEl = document.getElementById(`answer-${code}`);
+
+            const questionBlob = await generatePDFBlob(questionEl);
+            const answerBlob = await generatePDFBlob(answerEl);
+
+            zip.file(`${code}.pdf`, questionBlob);
+            zip.file(`${code}-ANSWER.pdf`, answerBlob);
         }
+
         const content = await zip.generateAsync({ type: 'blob' });
         saveAs(content, 'SONAAALU_Question_Papers.zip');
         setLoading(false);
@@ -171,54 +156,66 @@ const AdminPanel = () => {
                 </>
             )}
 
-            {generatedPapers.map((paper, index) => (
-                <div key={index} id={`paper-${index}`} style={{ marginTop: '30px', padding: '15px', border: '1px solid #ccc', backgroundColor: '#fff' }}>
-                    <h3>🆔 Paper Code: {paper.code}</h3>
-                    <h4>📄 Question Paper</h4>
-                    <ol>
-                        <li><strong>Fill in the Blanks</strong>
-                            <ol>{paper.fillBlanks.map((q, i) => (
-                                <li key={i}>{q.Question || q.question}
-                                    <div style={{ borderBottom: '1px solid #aaa', marginTop: '10px', height: '25px' }}></div>
+            {generatedPapers.map((paper, index) => {
+                const allQuestions = [
+                    ...paper.fillBlanks,
+                    ...paper.objective,
+                    ...paper.trueFalse,
+                    ...paper.descriptive
+                ];
+                return (
+                    <div key={index}>
+                        {/* Question Paper */}
+                        <div id={`question-${paper.code}`} style={{ marginTop: '30px', padding: '15px', border: '1px solid #ccc', backgroundColor: '#fff' }}>
+                            <h3>🆔 Paper Code: {paper.code}</h3>
+                            <h4>📄 Question Paper</h4>
+                            <ol>
+                                <li><strong>Fill in the Blanks</strong>
+                                    <ol>{paper.fillBlanks.map((q, i) => (
+                                        <li key={i}>{q.Question || q.question}<div style={{ borderBottom: '1px solid #aaa', marginTop: '10px', height: '25px' }}></div></li>
+                                    ))}</ol>
                                 </li>
-                            ))}</ol>
-                        </li>
-                        <li><strong>Objective Type Questions</strong>
-                            <ol>{paper.objective.map((q, i) => (
-                                <li key={i}>{q.Question || q.question}
-                                    <div style={{ borderBottom: '1px dotted #aaa', marginTop: '10px', height: '15px', width: '50%' }}></div>
+                                <li><strong>Objective Type Questions</strong>
+                                    <ol>{paper.objective.map((q, i) => (
+                                        <li key={i}>{q.Question || q.question}<div style={{ borderBottom: '1px dotted #aaa', marginTop: '10px', height: '15px', width: '50%' }}></div></li>
+                                    ))}</ol>
                                 </li>
-                            ))}</ol>
-                        </li>
-                        <li><strong>True / False</strong>
-                            <ol>{paper.trueFalse.map((q, i) => (
-                                <li key={i}>{q.Question || q.question}
-                                    <div style={{ borderBottom: '1px dashed #aaa', marginTop: '10px', height: '15px', width: '30%' }}></div>
+                                <li><strong>True / False</strong>
+                                    <ol>{paper.trueFalse.map((q, i) => (
+                                        <li key={i}>{q.Question || q.question}<div style={{ borderBottom: '1px dashed #aaa', marginTop: '10px', height: '15px', width: '30%' }}></div></li>
+                                    ))}</ol>
                                 </li>
-                            ))}</ol>
-                        </li>
-                        <li><strong>Descriptive Type Questions</strong>
-                            <ol>{paper.descriptive.map((q, i) => (
-                                <li key={i}>{q.Question || q.question}
-                                    <div style={{ border: '1px solid #aaa', marginTop: '10px', height: '80px' }}></div>
+                                <li><strong>Descriptive Type Questions</strong>
+                                    <ol>{paper.descriptive.map((q, i) => (
+                                        <li key={i}>{q.Question || q.question}<div style={{ border: '1px solid #aaa', marginTop: '10px', height: '80px' }}></div></li>
+                                    ))}</ol>
                                 </li>
-                            ))}</ol>
-                        </li>
-                    </ol>
+                            </ol>
+                        </div>
 
-                    <h4>✅ Answer Key</h4>
-                    <ul>
-                        {[...paper.fillBlanks, ...paper.objective, ...paper.trueFalse, ...paper.descriptive].map((q, i) => (
-                            <li key={i}><strong>Q{i + 1}:</strong> {q.Answer || q.answer || '⚠️ Missing Answer'}</li>
-                        ))}
-                    </ul>
-
-                    <button onClick={async () => {
-                        const blob = await generatePDFBlob(document.getElementById(`paper-${index}`));
-                        saveAs(blob, `${paper.code}.pdf`);
-                    }}>📄 Download PDF</button>
-                </div>
-            ))}
+                        {/* Answer Sheet – Moved off-screen instead of hidden */}
+                        <div
+                            id={`answer-${paper.code}`}
+                            style={{
+                                position: 'absolute',
+                                left: '-9999px',
+                                top: '0',
+                                width: '210mm',
+                                padding: '20px',
+                                backgroundColor: '#fff',
+                            }}
+                        >
+                            <h3>🆔 Answer Sheet: {paper.code}</h3>
+                            <h4>✅ Answer Key</h4>
+                            <ol>
+                                {allQuestions.map((q, i) => (
+                                    <li key={i}><strong>Q{i + 1}:</strong> {q.Answer || q.answer || '⚠️ Missing Answer'}</li>
+                                ))}
+                            </ol>
+                        </div>
+                    </div>
+                );
+            })}
         </div>
     );
 };
