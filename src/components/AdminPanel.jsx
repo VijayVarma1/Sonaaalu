@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import jsPDF from 'jspdf';
@@ -7,15 +7,21 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
 const AdminPanel = () => {
-    const [config, setConfig] = useState({
+    const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('config')) || {
         fillBlanks: { marks: '', count: '' },
         objective: { marks: '', count: '' },
         trueFalse: { marks: '', count: '' },
         descriptive: { marks: '', count: '' },
     });
-    const [numPapers, setNumPapers] = useState(1);
+    const [numPapers, setNumPapers] = useState(() => parseInt(localStorage.getItem('numPapers')) || 1);
     const [excelData, setExcelData] = useState({});
     const [generatedPapers, setGeneratedPapers] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('config', JSON.stringify(config));
+        localStorage.setItem('numPapers', numPapers);
+    }, [config, numPapers]);
 
     const handleConfigChange = (e, section, field) => {
         const value = parseInt(e.target.value) || '';
@@ -35,12 +41,22 @@ const AdminPanel = () => {
                 acc[name] = XLSX.utils.sheet_to_json(workbook.Sheets[name]);
                 return acc;
             }, {});
+            const expectedSheets = ['Sheet1', 'Sheet2', 'Sheet3', 'Sheet4'];
+            const missing = expectedSheets.filter(sheet => !sheets[sheet]);
+            if (missing.length) {
+                alert(`Missing sheets in Excel file: ${missing.join(', ')}`);
+                return;
+            }
             setExcelData(sheets);
         };
         reader.readAsBinaryString(file);
     };
 
-    const getRandomItems = (arr, count) => {
+    const getRandomItems = (arr, count, sectionName) => {
+        if (!arr || arr.length < count) {
+            alert(`Not enough questions in ${sectionName}. Needed: ${count}, Available: ${arr.length}`);
+            return [];
+        }
         const shuffled = [...arr].sort(() => 0.5 - Math.random());
         return shuffled.slice(0, count);
     };
@@ -48,11 +64,11 @@ const AdminPanel = () => {
     const handleGeneratePaper = () => {
         const papers = [];
         for (let i = 0; i < numPapers; i++) {
-            const code = `RIL-${uuidv4().slice(0, 6).toUpperCase()}`;
-            const fillBlanks = getRandomItems(excelData['Sheet1'] || [], config.fillBlanks.count);
-            const objective = getRandomItems(excelData['Sheet2'] || [], config.objective.count);
-            const trueFalse = getRandomItems(excelData['Sheet3'] || [], config.trueFalse.count);
-            const descriptive = getRandomItems(excelData['Sheet4'] || [], config.descriptive.count);
+            const code = `RIL-${uuidv4().slice(0, 6).toUpperCase()}-${i + 1}`;
+            const fillBlanks = getRandomItems(excelData['Sheet1'], config.fillBlanks.count, 'Fill in the Blanks');
+            const objective = getRandomItems(excelData['Sheet2'], config.objective.count, 'Objective');
+            const trueFalse = getRandomItems(excelData['Sheet3'], config.trueFalse.count, 'True/False');
+            const descriptive = getRandomItems(excelData['Sheet4'], config.descriptive.count, 'Descriptive');
             papers.push({ code, fillBlanks, objective, trueFalse, descriptive });
         }
         setGeneratedPapers(papers);
@@ -75,6 +91,7 @@ const AdminPanel = () => {
     };
 
     const downloadAllAsZip = async () => {
+        setLoading(true);
         const zip = new JSZip();
         for (let i = 0; i < generatedPapers.length; i++) {
             const el = document.getElementById(`paper-${i}`);
@@ -83,6 +100,7 @@ const AdminPanel = () => {
         }
         const content = await zip.generateAsync({ type: 'blob' });
         saveAs(content, 'SONAAALU_Question_Papers.zip');
+        setLoading(false);
     };
 
     return (
@@ -138,7 +156,10 @@ const AdminPanel = () => {
             <button onClick={handleGeneratePaper}>🎲 Generate Random Paper(s)</button>
 
             {generatedPapers.length > 0 && (
-                <button onClick={downloadAllAsZip} style={{ marginLeft: '20px' }}>📦 Download All as ZIP</button>
+                <>
+                    <button onClick={downloadAllAsZip} style={{ marginLeft: '20px' }}>📦 Download All as ZIP</button>
+                    {loading && <span style={{ marginLeft: '10px' }}>⏳ Preparing ZIP...</span>}
+                </>
             )}
 
             {generatedPapers.map((paper, index) => (
@@ -182,6 +203,11 @@ const AdminPanel = () => {
                             <li key={i}><strong>Q{i + 1}:</strong> {q.Answer || q.answer || '⚠️ Missing Answer'}</li>
                         ))}
                     </ul>
+
+                    <button onClick={async () => {
+                        const blob = await generatePDFBlob(document.getElementById(`paper-${index}`));
+                        saveAs(blob, `${paper.code}.pdf`);
+                    }}>📄 Download PDF</button>
                 </div>
             ))}
         </div>
