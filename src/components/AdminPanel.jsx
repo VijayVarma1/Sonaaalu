@@ -53,8 +53,12 @@ const AdminPanel = () => {
     };
 
     const getRandomItems = (arr, count, sectionName) => {
-        if (!arr || arr.length < count) {
-            alert(`Not enough questions in ${sectionName}. Needed: ${count}, Available: ${arr.length}`);
+        if (!Array.isArray(arr)) {
+            alert(`❌ ${sectionName} data not loaded properly. Please check the uploaded Excel file.`);
+            return [];
+        }
+        if (arr.length < count) {
+            alert(`⚠️ Not enough questions in ${sectionName}. Needed: ${count}, Available: ${arr.length}`);
             return [];
         }
         const shuffled = [...arr].sort(() => 0.5 - Math.random());
@@ -62,6 +66,11 @@ const AdminPanel = () => {
     };
 
     const handleGeneratePaper = () => {
+        if (!excelData['Sheet1'] || !excelData['Sheet2'] || !excelData['Sheet3'] || !excelData['Sheet4']) {
+            alert('🚫 Please upload a valid Excel file with 4 sheets named Sheet1 to Sheet4 before generating papers.');
+            return;
+        }
+
         const papers = [];
         for (let i = 0; i < numPapers; i++) {
             const code = `RIL-${uuidv4().slice(0, 6).toUpperCase()}-${i + 1}`;
