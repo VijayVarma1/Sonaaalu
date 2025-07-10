@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
 import AdminPanel from './components/AdminPanel';
+import RecordPanel from './components/RecordPanel';
 
 function App() {
     const [showSplash, setShowSplash] = useState(true);
     const [videoStarted, setVideoStarted] = useState(false);
+    const [showRecord, setShowRecord] = useState(false);
     const videoRef = useRef(null);
 
     const handleStart = () => {
@@ -46,7 +48,7 @@ function App() {
                             width: '100%',
                             height: '100%',
                             objectFit: 'cover',
-                            pointerEvents: 'none' // disables pause, skip, click
+                            pointerEvents: 'none'
                         }}
                     >
                         <source src="/intro.mp4" type="video/mp4" />
@@ -54,7 +56,22 @@ function App() {
                     </video>
                 </div>
             ) : (
-                <AdminPanel />
+                <div style={{ position: 'relative' }}>
+                    <button
+                        onClick={() => setShowRecord(true)}
+                        style={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            padding: '6px 12px',
+                            zIndex: 1000
+                        }}
+                    >
+                        📁 Record
+                    </button>
+                    <AdminPanel />
+                    {showRecord && <RecordPanel onClose={() => setShowRecord(false)} />}
+                </div>
             )}
         </div>
     );
