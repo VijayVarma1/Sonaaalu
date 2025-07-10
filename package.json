@@ -2,7 +2,9 @@
   "name": "sonaaalu",
   "version": "0.1.0",
   "private": true,
-  "main": "electron.js",
+  "main": "public/electron.js",
+  "description": "PRAJNA Desktop Application",
+  "author": "Reliance Industries Limited",
   "dependencies": {
     "@craco/craco": "^6.4.3",
     "@testing-library/jest-dom": "^5.17.0",
@@ -14,6 +16,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
+    "recharts": "^3.1.0",
     "uuid": "^9.0.0",
     "web-vitals": "^3.3.1",
     "xlsx": "^0.18.5"
@@ -56,7 +59,7 @@
     },
     "files": [
       "build/**/*",
-      "electron.js"
+      "public/electron.js"
     ],
     "win": {
       "target": "nsis",
