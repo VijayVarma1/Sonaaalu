@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
 import AdminPanel from './components/AdminPanel';
 import RecordPanel from './components/RecordPanel';
+import DashboardPanel from './components/DashboardPanel'; // Importing DashboardPanel to support charts
 
 function App() {
     const [showSplash, setShowSplash] = useState(true);
     const [videoStarted, setVideoStarted] = useState(false);
     const [showRecord, setShowRecord] = useState(false);
+    const [showDashboard, setShowDashboard] = useState(false); // This is a good place to control the dashboard panel. Ensure the bar chart rendering logic is implemented inside DashboardPanel.
     const videoRef = useRef(null);
 
     const handleStart = () => {
@@ -17,6 +19,23 @@ function App() {
 
     const handleVideoEnd = () => {
         setShowSplash(false);
+    };
+
+    const handlePaperGenerated = ({ zipData, numPapers, config }) => {
+        const timestamp = new Date().toLocaleString();
+        const existing = JSON.parse(localStorage.getItem('paperRecords') || '[]');
+        const newRecord = {
+            timestamp,
+            numPapers,
+            zipData,
+            stats: {
+                fillBlanks: config.fillBlanks.count || 0,
+                objective: config.objective.count || 0,
+                trueFalse: config.trueFalse.count || 0,
+                descriptive: config.descriptive.count || 0
+            }
+        };
+        localStorage.setItem('paperRecords', JSON.stringify([...existing, newRecord]));
     };
 
     return (
@@ -69,8 +88,21 @@ function App() {
                     >
                         📁 Record
                     </button>
-                    <AdminPanel />
+                    <button
+                        onClick={() => setShowDashboard(true)}
+                        style={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 100,
+                            padding: '6px 12px',
+                            zIndex: 1000
+                        }}
+                    >
+                        📊 Dashboard
+                    </button>
+                    <AdminPanel onPaperGenerated={handlePaperGenerated} />
                     {showRecord && <RecordPanel onClose={() => setShowRecord(false)} />}
+                    {showDashboard && <DashboardPanel onClose={() => setShowDashboard(false)} />}
                 </div>
             )}
         </div>

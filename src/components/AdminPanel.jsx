@@ -1,21 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import html2pdf from 'html2pdf.js';
+import MiniDashboard from './MiniDashboard';
+import { ThemeContext } from '../ThemeContext';
 
-const AdminPanel = () => {
+const AdminPanel = ({ onPaperGenerated }) => {
+    const { theme, toggle } = useContext(ThemeContext);
+    const isDark = theme === 'dark';
+
     const [config, setConfig] = useState({
         fillBlanks: { marks: '', count: '' },
         objective: { marks: '', count: '' },
         trueFalse: { marks: '', count: '' },
         descriptive: { marks: '', count: '' },
     });
+
     const [numPapers, setNumPapers] = useState(1);
     const [excelData, setExcelData] = useState({});
     const [generatedPapers, setGeneratedPapers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [lastStats, setLastStats] = useState(null);
 
     const handleConfigChange = (e, section, field) => {
         const value = parseInt(e.target.value) || '';
@@ -46,19 +53,6 @@ const AdminPanel = () => {
         return shuffled.slice(0, count);
     };
 
-    const handleGeneratePaper = () => {
-        const papers = [];
-        for (let i = 0; i < numPapers; i++) {
-            const code = `RIL-${uuidv4().slice(0, 6).toUpperCase()}`;
-            const fillBlanks = getRandomItems(excelData['Sheet1'] || [], config.fillBlanks.count);
-            const objective = getRandomItems(excelData['Sheet2'] || [], config.objective.count);
-            const trueFalse = getRandomItems(excelData['Sheet3'] || [], config.trueFalse.count);
-            const descriptive = getRandomItems(excelData['Sheet4'] || [], config.descriptive.count);
-            papers.push({ code, fillBlanks, objective, trueFalse, descriptive });
-        }
-        setGeneratedPapers(papers);
-    };
-
     const getTotalMarks = () =>
         ['fillBlanks', 'objective', 'trueFalse', 'descriptive'].reduce(
             (sum, section) => sum + (config[section].marks || 0) * (config[section].count || 0),
@@ -79,6 +73,7 @@ const AdminPanel = () => {
     const downloadAllAsZip = async () => {
         setLoading(true);
         const zip = new JSZip();
+        let totalStats = { fillBlanks: 0, objective: 0, trueFalse: 0, descriptive: 0 };
 
         for (let i = 0; i < generatedPapers.length; i++) {
             const code = generatedPapers[i].code;
@@ -90,16 +85,50 @@ const AdminPanel = () => {
 
             zip.file(`${code}.pdf`, questionBlob);
             zip.file(`${code}-ANSWER.pdf`, answerBlob);
+
+            totalStats.fillBlanks += generatedPapers[i].fillBlanks.length;
+            totalStats.objective += generatedPapers[i].objective.length;
+            totalStats.trueFalse += generatedPapers[i].trueFalse.length;
+            totalStats.descriptive += generatedPapers[i].descriptive.length;
         }
 
         const content = await zip.generateAsync({ type: 'blob' });
-        saveAs(content, 'SONAAALU_Question_Papers.zip');
+        const zipUrl = URL.createObjectURL(content);
+        saveAs(content, 'PRAJNA_Question_Papers.zip');
         setLoading(false);
+
+        setLastStats(totalStats);
+
+        if (onPaperGenerated) {
+            onPaperGenerated({
+                zipData: zipUrl,
+                numPapers: generatedPapers.length,
+                config,
+            });
+        }
+    };
+
+    const handleGeneratePaper = () => {
+        const papers = [];
+        for (let i = 0; i < numPapers; i++) {
+            const code = `RIL-${uuidv4().slice(0, 6).toUpperCase()}`;
+            const fillBlanks = getRandomItems(excelData['Sheet1'] || [], config.fillBlanks.count);
+            const objective = getRandomItems(excelData['Sheet2'] || [], config.objective.count);
+            const trueFalse = getRandomItems(excelData['Sheet3'] || [], config.trueFalse.count);
+            const descriptive = getRandomItems(excelData['Sheet4'] || [], config.descriptive.count);
+            papers.push({ code, fillBlanks, objective, trueFalse, descriptive });
+        }
+        setGeneratedPapers(papers);
     };
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Segoe UI' }}>
-            <h2>SONAAALU – Admin Control Panel</h2>
+        <div className={isDark ? 'dark-theme' : 'light-theme'} style={{ padding: '20px', fontFamily: 'Segoe UI' }}>
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2>🧠 PRAJNA Admin Panel</h2>
+                <button onClick={toggle}>
+                    {isDark ? '🌞 Light Mode' : '🌙 Dark Mode'}
+                </button>
+            </header>
 
             <p><strong>Step 1: Configure Questions and Marks</strong></p>
             <table border="1" cellPadding="10">
@@ -151,9 +180,17 @@ const AdminPanel = () => {
 
             {generatedPapers.length > 0 && (
                 <>
-                    <button onClick={downloadAllAsZip} style={{ marginLeft: '20px' }}>📦 Download All as ZIP</button>
+                    <button onClick={downloadAllAsZip} style={{ marginLeft: '20px' }}>
+                        📦 Download All as ZIP
+                    </button>
                     {loading && <span style={{ marginLeft: '10px' }}>⏳ Preparing ZIP...</span>}
                 </>
+            )}
+
+            {lastStats && (
+                <div style={{ marginTop: '30px' }}>
+                    <MiniDashboard stats={lastStats} />
+                </div>
             )}
 
             {generatedPapers.map((paper, index) => {
@@ -165,7 +202,6 @@ const AdminPanel = () => {
                 ];
                 return (
                     <div key={index}>
-                        {/* Question Paper */}
                         <div id={`question-${paper.code}`} style={{ marginTop: '30px', padding: '15px', border: '1px solid #ccc', backgroundColor: '#fff' }}>
                             <h3>🆔 Paper Code: {paper.code}</h3>
                             <h4>📄 Question Paper</h4>
@@ -193,18 +229,7 @@ const AdminPanel = () => {
                             </ol>
                         </div>
 
-                        {/* Answer Sheet – Moved off-screen instead of hidden */}
-                        <div
-                            id={`answer-${paper.code}`}
-                            style={{
-                                position: 'absolute',
-                                left: '-9999px',
-                                top: '0',
-                                width: '210mm',
-                                padding: '20px',
-                                backgroundColor: '#fff',
-                            }}
-                        >
+                        <div id={`answer-${paper.code}`} style={{ display: 'none' }}>
                             <h3>🆔 Answer Sheet: {paper.code}</h3>
                             <h4>✅ Answer Key</h4>
                             <ol>

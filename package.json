@@ -5,11 +5,14 @@
   "dependencies": {
     "@craco/craco": "^7.1.0",
     "file-saver": "^2.0.5",
-    "html2pdf.js": "^0.10.1",
+    "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.10.3",
+    "jspdf": "^3.0.1",
     "jszip": "^3.10.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
+    "recharts": "^3.1.0",
     "uuid": "^9.0.1",
     "web-vitals": "^5.0.3",
     "xlsx": "^0.18.5"
@@ -37,5 +40,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3"
   }
 }
