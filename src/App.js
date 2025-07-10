@@ -37,7 +37,7 @@ function App() {
                                 cursor: 'pointer'
                             }}
                         >
-                            ▶️ PRAJNA
+                            ▶️ Welcome to Prajña
                         </button>
                     )}
 
