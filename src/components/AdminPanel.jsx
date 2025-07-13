@@ -80,8 +80,15 @@ const AdminPanel = ({ onPaperGenerated }) => {
             const questionEl = document.getElementById(`question-${code}`);
             const answerEl = document.getElementById(`answer-${code}`);
 
+            // 👉 Temporarily show answer element if hidden
+            const originalDisplay = answerEl.style.display;
+            answerEl.style.display = 'block';
+
             const questionBlob = await generatePDFBlob(questionEl);
             const answerBlob = await generatePDFBlob(answerEl);
+
+            // 👉 Re-hide it after generating PDF
+            answerEl.style.display = originalDisplay;
 
             zip.file(`${code}.pdf`, questionBlob);
             zip.file(`${code}-ANSWER.pdf`, answerBlob);
@@ -107,6 +114,7 @@ const AdminPanel = ({ onPaperGenerated }) => {
             });
         }
     };
+
 
     const handleGeneratePaper = () => {
         const papers = [];
