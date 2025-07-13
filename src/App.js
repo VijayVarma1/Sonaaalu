@@ -17,6 +17,7 @@ function App() {
         }
     };
 
+
     const handleVideoEnd = () => {
         setShowSplash(false);
     };
