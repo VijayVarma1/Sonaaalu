@@ -4,7 +4,6 @@ import RecordPanel from './components/RecordPanel';
 import DashboardPanel from './components/DashboardPanel'; // Importing DashboardPanel to support charts
 
 function App() {
-
     const [showSplash, setShowSplash] = useState(true);
     const [videoStarted, setVideoStarted] = useState(false);
     const [showRecord, setShowRecord] = useState(false);
