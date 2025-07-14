@@ -1,0 +1,24 @@
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - filter:
+      - build/**/*
+      - build/**/*
+      - public/electron.js
+extraMetadata:
+  main: public/electron.js
+appId: com.ril.prajna
+productName: PRAJNA
+asar: true
+win:
+  target: nsis
+  icon: icon.ico
+  sign: false
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+publish: null
+extends: react-cra
+electronVersion: 28.3.3

@@ -61,6 +61,10 @@
       "build/**/*",
       "public/electron.js"
     ],
+    "asar": true,
+    "extraMetadata": {
+      "main": "public/electron.js"
+    },
     "win": {
       "target": "nsis",
       "icon": "icon.ico",
@@ -70,6 +74,7 @@
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "publish": null
   }
 }
